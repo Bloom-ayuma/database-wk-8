@@ -1,0 +1,74 @@
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import mysql.connector
+
+app = FastAPI()
+
+# DB connection
+def get_db():
+    return mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="yourpassword",  # Replace with your MySQL password
+        database="ClinicDB"
+    )
+
+# Patient schema
+class Patient(BaseModel):
+    FirstName: str
+    LastName: str
+    Email: str
+    Phone: str
+
+# Create Patient
+@app.post("/patients/")
+def create_patient(patient: Patient):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO Patients (FirstName, LastName, Email, Phone)
+        VALUES (%s, %s, %s, %s)
+    """, (patient.FirstName, patient.LastName, patient.Email, patient.Phone))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"message": "Patient created successfully"}
+
+# Read Patient
+@app.get("/patients/{patient_id}")
+def read_patient(patient_id: int):
+    conn = get_db()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM Patients WHERE PatientID = %s", (patient_id,))
+    result = cursor.fetchone()
+    cursor.close()
+    conn.close()
+    if result:
+        return result
+    raise HTTPException(status_code=404, detail="Patient not found")
+
+# Update Patient
+@app.put("/patients/{patient_id}")
+def update_patient(patient_id: int, patient: Patient):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE Patients 
+        SET FirstName=%s, LastName=%s, Email=%s, Phone=%s 
+        WHERE PatientID=%s
+    """, (patient.FirstName, patient.LastName, patient.Email, patient.Phone, patient_id))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"message": "Patient updated"}
+
+# Delete Patient
+@app.delete("/patients/{patient_id}")
+def delete_patient(patient_id: int):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM Patients WHERE PatientID = %s", (patient_id,))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"message": "Patient deleted"}
